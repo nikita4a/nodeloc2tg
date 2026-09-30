@@ -54,7 +54,7 @@ class DiscourseClient:
             {
                 "User-Agent": user_agent,
                 "Accept": "application/json",
-                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Language": "zh-CN,zh;q=0.9",
             }
         )
 
@@ -303,9 +303,13 @@ def _html_to_text(html: str) -> str:
     # тролль-посты: «哦齁齁齁...» (смех×200), повторы одной фразы.
     # Если разнообразие символов ничтожно — контента нет, тело выбрасываем.
     if len(text) > 60:
-        uniqueness = len(set(text)) / len(text)
-        if uniqueness < 0.06:
-            return ""
+        # тролль-детект только для CJK-текста: латиница при 6% уникальных
+        # символов — норма для английского, а не признак «ха-ха×200»
+        cjk = sum(1 for ch in text if chr(0x4e00) <= ch <= chr(0x9fff))
+        if cjk > len(text) * 0.2:
+            uniqueness = len(set(text)) / len(text)
+            if uniqueness < 0.06:
+                return ""
     # пустые строки в начале/конце абзацев
     return text.strip()
 

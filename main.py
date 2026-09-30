@@ -182,6 +182,16 @@ def main() -> int:
         # 奶昔论坛 (Discuz, SIM/eSIM/KYC-тематика) — открытый RSS
         from naixi import NaixiRSS
         extra_sources["naixi"] = NaixiRSS(proxy=settings.nodeseek_proxy)
+    # threat-intel/leak-мониторы через публичное t.me/s-превью
+    if "cybermonitum" in _src:
+        from tg_channel import TGChannelSource
+        extra_sources["cybermonitum"] = TGChannelSource(
+            "CyberMonitum", proxy=settings.nodeseek_proxy)
+    if "cvedetector" in _src:
+        from tg_channel import TGChannelSource
+        extra_sources["cvedetector"] = TGChannelSource(
+            "CVEDetector", proxy=settings.nodeseek_proxy,
+            severity_min=7.0)
     if "v2ex" in _src:
         from cfsource import CFSource, ldo_title_allowed
 
