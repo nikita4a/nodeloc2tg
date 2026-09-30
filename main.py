@@ -192,6 +192,27 @@ def main() -> int:
         extra_sources["cvedetector"] = TGChannelSource(
             "CVEDetector", proxy=settings.nodeseek_proxy,
             severity_min=7.0)
+    # радарные веб-источники (linux.do/v2ex/52pojie/LET/reddit/HF/HN/...)
+    if settings.web_sources.strip().lower() not in ("none", "0", ""):
+        from websources import WEB_SOURCES, WebListSource
+        wanted = settings.web_sources.strip().lower()
+        for label, url, pattern, how in WEB_SOURCES:
+            if wanted != "all" and label not in wanted.split(","):
+                continue
+            extra_sources[label] = WebListSource(
+                label, url, pattern, how, proxy=settings.nodeseek_proxy)
+    # произвольные форумы по URL (авто-детект движка)
+    if settings.forum_urls:
+        from universalsource import UniversalForumSource
+        for u in settings.forum_urls.split(","):
+            u = u.strip()
+            if not u:
+                continue
+            src = UniversalForumSource(u, proxy=settings.nodeseek_proxy)
+            extra_sources[src.name] = src
+    log.info("Источники (%d): %s", len(extra_sources),
+             ", ".join(sorted(extra_sources)))
+
     if "v2ex" in _src:
         from cfsource import CFSource, ldo_title_allowed
 

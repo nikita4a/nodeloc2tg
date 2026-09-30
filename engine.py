@@ -211,10 +211,14 @@ class Engine:
                 return
 
         msg = build_message(t, title_ru, body_ru, self.s.max_body_chars)
+        # хантер API-ключей: ключи из оригинального текста — в <code>
+        keys_html = _keys_section(t)
+        if keys_html:
+            msg = f"{msg}\n\n{keys_html}"
 
+        # dry-run: никуда не постим, но в БД НЕ отмечаем — чтобы при
+        # реальном старте тема всё-таки ушла.
         if self.telegram is None:
-            # dry-run: никуда не постим, но в БД НЕ отмечаем — чтобы при
-            # реальном старте тема всё-таки ушла.
             log.info("[dry-run] Тема %d: %s (img=%s)",
                      t.topic_id, (title_ru or t.title)[:60],
                      "да" if t.image_url else "нет")
@@ -341,6 +345,20 @@ class Engine:
         log.info("Первый старт: помечено %d старых тем как уже известных "
                  "(initial_backfill=%d)", len(to_skip), n_backfill)
         return len(to_skip)
+
+
+def _keys_section(t) -> str:
+    """Хантер ключей: <code>-строки с найденными API-ключами ('' если нет)."""
+    from html import escape
+    from keyhunter import scan_keys
+    found = scan_keys((t.title or "") + "\n" + (t.body_text or ""))
+    if not found:
+        return ""
+    lines = []
+    for prov, ks in list(found.items())[:6]:
+        for k in sorted(ks)[:10]:
+            lines.append(f"🔑 {prov}: <code>{escape(k)}</code>")
+    return "\n".join(lines)
 
 
 def _has_cyrillic(text: str) -> bool:

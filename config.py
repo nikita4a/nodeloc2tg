@@ -160,6 +160,8 @@ class Settings:
     # Источник
     forum_base: str
     sources: str  # включённые источники через запятую: nodeloc,nodeseek
+    web_sources: str   # радарные веб-источники: all | none | список имён
+    forum_urls: str    # произвольные форумы по URL (авто-детект движка)
     nodeseek_proxy: str
 
     # Поведение
@@ -202,6 +204,8 @@ class Settings:
             tg_proxy=_get("TG_PROXY", ""),
             forum_base=_get("FORUM_BASE", "https://www.nodeloc.com").rstrip("/"),
             sources=_get("SOURCES", "nodeloc"),
+            web_sources=_get("WEBSOURCES", "all"),
+            forum_urls=_get("FORUM_URLS", ""),
             nodeseek_proxy=_get("NODESEEK_PROXY", ""),
             poll_interval=_get_int("POLL_INTERVAL", 300),
             latest_limit=_get_int("LATEST_LIMIT", 30),
