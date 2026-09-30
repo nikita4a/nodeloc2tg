@@ -7,3 +7,5 @@ data/
 __pycache__/
 .bot.lock
 screenshots/
+state.db-shm
+state.db-wal
