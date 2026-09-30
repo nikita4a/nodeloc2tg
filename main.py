@@ -192,6 +192,17 @@ def main() -> int:
         extra_sources["cvedetector"] = TGChannelSource(
             "CVEDetector", proxy=settings.nodeseek_proxy,
             severity_min=7.0)
+    # произвольные TG-каналы из .env: абуз/хостинг/даркнет-зеркала форумов
+    # (TG_CHANNELS=@chan1,@chan2) — любой публичный канал без кода
+    if settings.tg_channels.strip():
+        from tg_channel import TGChannelSource
+        for ch in settings.tg_channels.split(","):
+            ch = ch.strip().lstrip("@")
+            if not ch:
+                continue
+            extra_sources[f"tg-{ch}"] = TGChannelSource(
+                ch, proxy=settings.nodeseek_proxy)
+            log.info("TG-канал из .env: @%s", ch)
     # радарные веб-источники (linux.do/v2ex/52pojie/LET/reddit/HF/HN/...)
     if settings.web_sources.strip().lower() not in ("none", "0", ""):
         from websources import WEB_SOURCES, WebListSource

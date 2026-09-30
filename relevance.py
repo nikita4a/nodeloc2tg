@@ -49,6 +49,7 @@ _STRONG_GOOD = re.compile(
         |出[：:]|收[：:]|拼车|发车
         |优惠码|邀请码|促销码|返现|返利
         |giveaway|discount|\bfree\b|release|announc
+        |bulletproof|dmca|абуз|abuse[- ](?:free|friendly|tolerant|ignored)
     )""", re.IGNORECASE | re.VERBOSE)
 
 _STRONG_GOOD_RU = re.compile(

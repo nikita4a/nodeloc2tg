@@ -195,6 +195,7 @@ class Settings:
 
     # Статус-уведомления в канал (heartbeat)
     heartbeat_hours: float  # период статус-поста; 0 = выключено
+    tg_channels: str  # произвольные TG-каналы: @chan1,@chan2
 
     @classmethod
     def load(cls) -> "Settings":
@@ -230,6 +231,7 @@ class Settings:
             max_caption_chars=_get_int("MAX_CAPTION_CHARS", 900),
             log_level=_get("LOG_LEVEL", "INFO"),
             heartbeat_hours=_get_float("HEARTBEAT_HOURS", 6.0),
+            tg_channels=_get("TG_CHANNELS", ""),
         )
 
 
