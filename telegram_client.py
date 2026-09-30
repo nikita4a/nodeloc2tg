@@ -31,6 +31,8 @@ class TelegramClient:
         self.channel_id = channel_id
         # мульти-таргет: '7448683285,@NODELOCRUS' — постим во все
         self.targets = [t.strip() for t in channel_id.split(',') if t.strip()]
+        # delete/статусы — только на первичный таргет (ЛС), не сырую строку
+        self.channel_id = self.targets[0] if self.targets else channel_id
         self.timeout = timeout
         self.session = requests.Session()
         # trust_env=False: игнорировать системные прокси-переменные (HTTP_PROXY и

@@ -230,9 +230,12 @@ class UniversalForumSource:
         md = self._jina_get(self.base)
         if len(md) < 300:
             return []
+        from websources import JUNK_TITLE, PIN_TITLE, clean_title
         out, seen = [], set()
-        for m in re.finditer(r"\[([^\]\[]{8,150})\]\((https?://[^)]+)\)", md):
+        for m in re.finditer(r"\[([^\]\[]{8,150})\]\((https?://[^\s)\"]+)[^)]*\)", md):
             title, link = m.group(1).strip(), m.group(2).strip()
+            if JUNK_TITLE.match(title) or PIN_TITLE.search(title):
+                continue
             lhost = urlparse(link).hostname or ""
             path = urlparse(link).path
             if lhost != host or not path or path in ("/",):

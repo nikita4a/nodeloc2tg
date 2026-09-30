@@ -163,7 +163,7 @@ class WebListSource:
     # ---------- парсеры ----------
     def _parse_topics(self, md: str) -> list[dict]:
         items, seen = [], set()
-        for m in re.finditer(r"\[([^\]]{8,150})\]\((https?://[^)]+)\)", md):
+        for m in re.finditer(r"\[([^\]]{8,150})\]\((https?://[^\s)\"]+)[^)]*\)", md):
             title, link = m.group(1).strip(), m.group(2).strip()
             idm = re.search(self.pattern, link)
             if not idm or idm.group(1) in seen:
@@ -214,12 +214,14 @@ class WebListSource:
 
     # ---------- интерфейс источника ----------
     def latest(self, limit: int = 30) -> list[int]:
-        # round-robin по эпохе (5-мин слот): окно из _WEB_PER_CYCLE штук
+        # round-robin по эпохе (5-мин слот), stride 7 (взаимно простой с total)
+        # разводит соседние источники (reddit-сабы) по разным окнам.
+        # None = «не мой слот» — engine пропускает молча (не [] с варнингом).
         total = WebListSource._seq
         if total > _WEB_PER_CYCLE:
             epoch = int(time.time() // 300)
-            if (self._seq + epoch) % total >= _WEB_PER_CYCLE:
-                return []  # не мой слот — тихо пропускаем
+            if (self._seq + epoch * 7) % total >= _WEB_PER_CYCLE:
+                return None
         if "reddit.com" in self.list_url:  # анти-429
             wait = 25 - (time.time() - REDDIT_LAST[0])
             if wait > 0:

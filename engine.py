@@ -116,6 +116,8 @@ class Engine:
                            force_post: bool) -> None:
         """Источник без категорий (NodeSeek и т.п.): только возраст + дедуп."""
         ids = src.latest(self.s.latest_limit)
+        if ids is None:
+            return  # ротация: не слот источника — тихо
         if not ids:
             log.warning("%s: не получили список тем", name)
             return
