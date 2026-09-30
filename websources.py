@@ -83,7 +83,7 @@ DATE_TAIL = re.compile(
     re.I)
 PIN_TITLE = re.compile(
     r"(版规|总版规|违规怎么办|清理未活跃会员|破解入门|逆向入门|论坛精华集|"
-    r"权威发布|优秀会员名单|入门教学|禁止发布任何可能存在商业侵权)", re.I)
+    r"权威发布|优秀会员名单|入门教学|禁止发布任何可能存在商业侵权|关于.*类别)", re.I)
 
 REDDIT_LAST = [0.0]
 
@@ -112,7 +112,7 @@ def _tid(link: str) -> int:
 
 class WebListSource:
     # тред-фечи через jina дорогие — берём немного нового за цикл
-    min_body = 120
+    min_body = 40
 
     def __init__(self, name: str, list_url: str, pattern: str,
                  how: str = "jina", proxy: str = "", timeout: int = 45):
