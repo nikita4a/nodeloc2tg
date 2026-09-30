@@ -67,7 +67,9 @@ class TGChannelSource:
                 except ValueError:
                     pass
             # медиа этого сообщения
-            photos = re.findall(r"background-image:url\('([^']+)'\)", ch)
+            photos = [p2 if p2.startswith("http") else "https:" + p2
+                      for p2 in re.findall(r"background-image:url\('([^']+)'\)", ch)
+                      if not p2.startswith("data:")]
             vid = re.search(r'<video[^>]+src="([^"]+)"', ch)
             # заголовок = первая непустая строка (обрезана до 120), тело = остальное
             lines = [ln.strip() for ln in t.split("\n") if ln.strip()]
