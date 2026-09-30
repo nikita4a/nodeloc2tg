@@ -68,9 +68,36 @@ class Engine:
         except Exception:
             log.exception("NodeLoc: сбой прохода — продолжаем другие источники")
             res.errors += 1
+        # --- фаза 1: листинги веб-источников ПАРАЛЛЕЛЬНО (сеть — узкое
+        # место цикла: jina 1-10с на источник, reddit-паузы). Кэш каждого
+        # источника наполняется в его потоке; обработка — строго послед.
+        pre: dict = {}
+        try:
+            from concurrent.futures import ThreadPoolExecutor
+            from websources import WebListSource
+            web_names = [n for n, s in self.extra_sources.items()
+                         if isinstance(s, WebListSource)]
+            if len(web_names) > 1:
+
+                def _fetch(n: str):
+                    try:
+                        return n, self.extra_sources[n].latest(
+                            self.s.latest_limit)
+                    except Exception:
+                        log.warning("%s: листинг (parallel) сбой", n)
+                        return n, None
+
+                with ThreadPoolExecutor(max_workers=8) as ex:
+                    for n, ids in ex.map(_fetch, web_names):
+                        pre[n] = ids
+        except ImportError:
+            pre = {}
+
+        # --- фаза 2: обработка последовательно (storage/TG — не потокобез.)
         for name, src in self.extra_sources.items():
             try:
-                self._run_simple_source(name, src, res, force_post)
+                self._run_simple_source(name, src, res, force_post,
+                                        pre_ids=pre.get(name))
             except Exception:
                 log.exception("Источник %s: сбой прохода — продолжаем", name)
                 res.errors += 1
@@ -113,9 +140,14 @@ class Engine:
                                   source="nodeloc")
 
     def _run_simple_source(self, name: str, src, res: StepResult,
-                           force_post: bool) -> None:
-        """Источник без категорий (NodeSeek и т.п.): только возраст + дедуп."""
-        ids = src.latest(self.s.latest_limit)
+                           force_post: bool, pre_ids=None) -> None:
+        """Источник без категорий (NodeSeek и т.п.): только возраст + дедуп.
+
+        pre_ids: листинг уже получен параллельной фазой (веб-источники);
+        None = «не запрашивали» → фетчим сами. Внутри может быть None
+        (ротация/сбой параллельного фетча) — тихий пропуск."""
+        ids = pre_ids if pre_ids is not None else src.latest(
+            self.s.latest_limit)
         if ids is None:
             return  # ротация: не слот источника — тихо
         if not ids:

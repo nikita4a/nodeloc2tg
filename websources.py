@@ -70,6 +70,10 @@ WEB_SOURCES = [
      r"https://lowendspirit\.com/discussion/(\d+)/[a-z0-9-]+", "rss"),
     ("hackernews-ai", "https://hnrss.org/newest?q=AI&points=3&count=15",
      r"news\.ycombinator\.com/item\?id=(\d+)", "rss_body"),
+    # hackforums (даркнет/cracking-маркет: раздачи Spotify, SMS-активации,
+    # криптеры) — jina-рендер; lowendbox — VPS-халява-офферы (WordPress feed)
+    ("hackforums", "https://hackforums.net/", r"showthread\.php\?tid=(\d+)", "jina"),
+    ("lowendbox", "https://lowendbox.com/feed/", r"lowendbox\.com/([a-z0-9-]{5,})", "rss_url"),
 ]
 
 JUNK_TITLE = re.compile(
@@ -89,7 +93,7 @@ REDDIT_LAST = [0.0]
 
 # ротация: за 5-мин цикл опрашиваем только окно из N веб-источников —
 # меньше 429 (reddit/jina), быстрее цикл, полнота за 2-3 цикла
-_WEB_PER_CYCLE = 10
+_WEB_PER_CYCLE = 16
 
 
 def clean_title(t: str) -> str:
@@ -235,6 +239,11 @@ class WebListSource:
                 topics = self._parse_topics(raw)
         elif self.how == "rss":
             raw = self._http_get(self.list_url.rstrip("/") + "/feed.rss")
+            if len(raw) > 300:
+                topics = self._parse_feed(raw)
+        elif self.how == "rss_url":
+            # фид по прямому URL (WordPress /feed/ и т.п.)
+            raw = self._http_get(self.list_url)
             if len(raw) > 300:
                 topics = self._parse_feed(raw)
         elif self.how == "rss_body":
