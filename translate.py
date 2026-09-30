@@ -14,6 +14,13 @@ import time
 
 log = logging.getLogger(__name__)
 
+# LLM-отказ («я не могу...») — НЕ постим как саммари: лечим фоллбек-моделью
+# или обычным переводом. Четвёртый случай утечки — 2026-09-30 (11798/11799).
+_REFUSAL_RE = __import__("re").compile(
+    r"(?i)^(я\s+не\s+могу|не\s+могу\s+|i\s+can'?t|i\s+cannot|"
+    r"i'?m\s+sorry|извините|sorry,)", )
+
+
 # лимит одного запроса к бесплатному гуглу — осторожно, около 5000 символов
 _CHUNK = 4500
 
@@ -256,6 +263,8 @@ class Translator:
                     raise RuntimeError(f"http {resp.status_code}")
                 content = (data["choices"][0].get("message", {})
                            .get("content") or "").strip()
+                if content and _REFUSAL_RE.match(content):
+                    raise RuntimeError("LLM-отказ (refusal)")
                 if content:
                     return _collapse_loops(content)
             except Exception as e:
@@ -299,6 +308,8 @@ class Translator:
                                            f"{str(data)[:100]}")
                     content = (data["choices"][0].get("message", {})
                                .get("content") or "").strip()
+                    if content and _REFUSAL_RE.match(content):
+                        raise RuntimeError("LLM-отказ (refusal)")
                     if not content:
                         # reasoning-модель потратила лимит на размышления
                         fr = data["choices"][0].get("finish_reason", "")
