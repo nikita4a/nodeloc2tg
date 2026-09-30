@@ -74,6 +74,13 @@ WEB_SOURCES = [
     # криптеры) — jina-рендер; lowendbox — VPS-халява-офферы (WordPress feed)
     ("hackforums", "https://hackforums.net/", r"showthread\.php\?tid=(\d+)", "jina"),
     ("lowendbox", "https://lowendbox.com/feed/", r"lowendbox\.com/(?:blog/)?([a-z0-9-]{8,})", "rss_url"),
+    # серверы/хомлаб/VPS: XenForo-фид; Linux/хардware: Discourse; underground
+    ("servethehome", "https://forums.servethehome.com/index.php?forums/-/index.rss",
+     r"threads/(\d+)", "rss_url"),
+    ("level1techs", "https://forum.level1techs.com/latest.rss",
+     r"/t/[^/]+/(\d+)", "rss_url"),
+    ("0x00sec", "https://0x00sec.org/rss/",
+     r"/t/[^/]+/(\d+)", "rss_url"),
 ]
 
 JUNK_TITLE = re.compile(
@@ -269,7 +276,7 @@ class WebListSource:
         if it is None:
             return None
         body = it.get("body") or ""
-        if len(body) < 200 and self.how == "jina":
+        if len(body) < 200 and self.how in ("jina", "rss", "rss_url"):
             body = self._jina_get(it["link"])[:6000]
         elif len(body) < 200 and self.how == "rss":
             body = self._jina_get(it["link"])[:6000]
