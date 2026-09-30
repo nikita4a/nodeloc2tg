@@ -59,7 +59,7 @@ def _hidden_notice(topic: Topic) -> str:
 # текст скрыт «шторкой» и раскрывается по тапу (formatting: hidden).
 PROMO_HTML = ('<span class="tg-spoiler"><b>⚡️ '
               '<a href="https://t.me/iishkogatewaybot">@iishkogatewaybot'
-              ' — бесплатные нейросети</a></b></span>')
+              ' — бесплатные китайские нейросети</a></b></span>')
 
 
 def _quote(body: str) -> str:
