@@ -73,7 +73,7 @@ WEB_SOURCES = [
     # hackforums (даркнет/cracking-маркет: раздачи Spotify, SMS-активации,
     # криптеры) — jina-рендер; lowendbox — VPS-халява-офферы (WordPress feed)
     ("hackforums", "https://hackforums.net/", r"showthread\.php\?tid=(\d+)", "jina"),
-    ("lowendbox", "https://lowendbox.com/feed/", r"lowendbox\.com/([a-z0-9-]{5,})", "rss_url"),
+    ("lowendbox", "https://lowendbox.com/feed/", r"lowendbox\.com/(?:blog/)?([a-z0-9-]{8,})", "rss_url"),
 ]
 
 JUNK_TITLE = re.compile(
