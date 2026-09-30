@@ -272,46 +272,16 @@ def main() -> int:
             up = (f"{int(uptime_h)}ч {int(uptime_h % 1 * 60)}м"
                   if uptime_h >= 1 else f"{int(uptime_h * 60)}м")
 
-            # --- сводка стабильности ---
-            ok = hb["errors"] == 0
-            head = ("✅ Стабильно" if ok else f"⚠️ Ошибок: {hb['errors']}")
-            lines = [
-                "<b>🤖 Часовой отчёт nodeloc2tg</b>",
-                "",
-                f"{head} | Аптайм {up} | Циклов {hb['cycles']}",
-            ]
+            # статы — только в лог, в канал не постим (по запросу юзера)
+            log.info("hb: аптайм %s | циклов %d | постов %d | отфильтровано %d | ошибок %d",
+                     up, hb["cycles"], hb["posted"], len(hb["filtered_log"]),
+                     hb["errors"])
 
-            # --- опубликованные посты ---
-            posted = hb["posted_log"]
-            n_ru = sum(1 for p in posted if p.get("translated"))
-            lines.append(f"📰 Опубликовано: {len(posted)}")
-            for p in posted[:10]:
-                mark = "🇷🇺" if p.get("translated") else "⚠️без перевода"
-                tt = datetime.fromtimestamp(p.get("time", 0)).strftime("%H:%M")
-                lines.append(f"  • {tt} [{escape(str(p.get('cat',''))[:14])}] "
-                             f"{mark} {escape(p['title'][:55])}")
-            if not posted:
-                lines.append("  (новых тем по фильтрам не было)")
-            elif n_ru < len(posted):
-                lines.append(f"  ⚠️ Перевод: {n_ru}/{len(posted)} на русском — проверить!")
-
-            # --- что отфильтровано и почему ---
-            flt = hb["filtered_log"]
-            if flt:
-                by_reason: dict = {}
-                for f in flt:
-                    by_reason.setdefault(f["reason"], []).append(f)
-                reasons = ", ".join(f"{r}: {len(v)}" for r, v in by_reason.items())
-                lines.append(f"🚫 Отфильтровано: {len(flt)} ({reasons})")
-                for f in flt[:5]:
-                    lines.append(f"  • [{f['reason']}] {escape(f['title'][:50])}")
-                if len(flt) > 5:
-                    lines.append(f"  … и ещё {len(flt)-5}")
-
-            if hb["dupes"]:
-                lines.append(f"♻️ Дублей отклонено: {hb['dupes']}")
-
-            text = "\n".join(lines)
+            # часовой слот в канале = промо бренда юзера
+            text = ("⚡️ <b>Бесплатные нейросети — без карты и лимитов</b>\n\n"
+                    "GPT, Claude, Gemini и другие топ-модели в одном боте:\n"
+                    "👉 <b>@iishogatewaybot</b>\n\n"
+                    "<i>Подписка на канал — свежие раздачи и ключи каждый день.</i>")
 
             # старый отчёт — удалить (один активный в канале)
             old_mid = storage.get_meta("hb_msg_id", "")

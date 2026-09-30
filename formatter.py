@@ -57,9 +57,9 @@ def _hidden_notice(topic: Topic) -> str:
 
 # Промо проекта: отдельная строка под цитатой, завёрнутая в tg-spoiler —
 # текст скрыт «шторкой» и раскрывается по тапу (formatting: hidden).
-PROMO_HTML = ('<span class="tg-spoiler"><b>🔥 '
-              '<a href="https://example.com">ТВОЙ БРЕНД — слоган</a>'
-              '</b></span>')
+PROMO_HTML = ('<span class="tg-spoiler"><b>⚡️ '
+              '<a href="https://t.me/iishogatewaybot">@iishogatewaybot'
+              ' — бесплатные нейросети</a></b></span>')
 
 
 def _quote(body: str) -> str:

@@ -213,14 +213,15 @@ class WebListSource:
         return items
 
     # ---------- интерфейс источника ----------
-    def latest(self, limit: int = 30) -> list[int]:
-        # round-robin по эпохе (5-мин слот), stride 7 (взаимно простой с total)
-        # разводит соседние источники (reddit-сабы) по разным окнам.
+    def latest(self, limit: int = 30) -> list[int] | None:
+        # round-robin по эпохе (5-мин слот). seq*7 (взаимно простой с total)
+        # разбрасывает СОСЕДНИЕ источники (reddit-сабы идут подряд) по окнам:
+        # s=20..23 → 20,3,10,17 — максимум 1-2 реддита в окне из 10.
         # None = «не мой слот» — engine пропускает молча (не [] с варнингом).
         total = WebListSource._seq
         if total > _WEB_PER_CYCLE:
             epoch = int(time.time() // 300)
-            if (self._seq + epoch * 7) % total >= _WEB_PER_CYCLE:
+            if (self._seq * 7 + epoch) % total >= _WEB_PER_CYCLE:
                 return None
         if "reddit.com" in self.list_url:  # анти-429
             wait = 25 - (time.time() - REDDIT_LAST[0])
