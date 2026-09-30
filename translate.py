@@ -210,6 +210,59 @@ class Translator:
         "Отвечай ТОЛЬКО переводом, без комментариев."
     )
 
+    _LLM_SUMMARY_PROMPT = (
+        "Ты — редактор телеграм-канала по китайским техно-форумам "
+        "(VPS/хостинг, AI-модели, подписки, скидки, халява). Переведи пост "
+        "на русский и сожми в саммари на 2-5 предложений: суть раздачи/сделки, "
+        "что дают, кому и до какого срока. ДОСЛОВНО сохраняй: ссылки, API-ключи, "
+        "промокоды, инвайт-коды (邀请码), цены, сроки. Форумный сленг: "
+        "白嫖/薅羊毛=халява; 车位=слот подписки; 拼车=совместная подписка; "
+        "出=продаю; 收=куплю; 机场=VPN-сервис; 小鸡=дешёвый VPS; 鸡蛋=бонусы; "
+        "封号=бан; 跑路=сбежал с деньгами; 风控=антифрод. "
+        "Отвечай ТОЛЬКО готовым саммари на русском, без комментариев."
+    )
+
+    def translate_summary(self, text: str) -> str:
+        """Перевод + сжатие в саммари одним LLM-вызовом (пост = короткое тело).
+
+        Без LLM или при сбое обеих моделей — обычный translate().
+        """
+        if not text or not text.strip():
+            return text
+        if self._llm_session is None:
+            return self.translate(text)
+        import json as _json
+        self._throttle()
+        piece = text[:4000]
+        for model in (self._llm_model, self._llm_fallback):
+            if not model:
+                continue
+            try:
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": self._LLM_SUMMARY_PROMPT},
+                        {"role": "user", "content": piece},
+                    ],
+                    "max_tokens": 4000,
+                    "temperature": 0.2,
+                }
+                resp = self._llm_session.post(
+                    f"{self._llm_base}/chat/completions",
+                    data=_json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    timeout=90)
+                data = resp.json()
+                if resp.status_code != 200 or "choices" not in data:
+                    raise RuntimeError(f"http {resp.status_code}")
+                content = (data["choices"][0].get("message", {})
+                           .get("content") or "").strip()
+                if content:
+                    return _collapse_loops(content)
+            except Exception as e:
+                log.warning("LLM-саммари (%s) не смог: %s — фоллбек",
+                            model, e)
+        return self.translate(text)
+
     def _llm_translate(self, text: str, timeout: int = 60) -> str:
         """Перевод через OpenAI-совместимый LLM (качество выше машинных движков).
 

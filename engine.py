@@ -190,7 +190,8 @@ class Engine:
             return
 
         title_ru = self.translator.translate(t.title) if t.title else ""
-        body_ru = self.translator.translate(t.body_text) if t.body_text else ""
+        body_ru = (self.translator.translate_summary(t.body_text)
+                   if t.body_text else "")
 
         # LLM-фильтр релевантности: нытьё/вопросы/болтовня не публикуются.
         # Fail-open: сбой LLM → тема проходит (не теряем контент).
