@@ -5,7 +5,9 @@
 """
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -347,17 +349,39 @@ class Engine:
         return len(to_skip)
 
 
+_KEYS_SEEN_DIR = Path(__file__).resolve().parent / "data"
+_KEYS_SEEN_PATH = _KEYS_SEEN_DIR / "keys_seen.json"
+
+
+def _load_keys_seen() -> set:
+    try:
+        return set(json.loads(_KEYS_SEEN_PATH.read_text(encoding="utf-8")))
+    except Exception:
+        return set()
+
+
 def _keys_section(t) -> str:
-    """Хантер ключей: <code>-строки с найденными API-ключами ('' если нет)."""
+    """Хантер ключей: <code>-строки с НОВЫМИ ключами (дедуп между постами)."""
     from html import escape
     from keyhunter import scan_keys
     found = scan_keys((t.title or "") + "\n" + (t.body_text or ""))
     if not found:
         return ""
-    lines = []
+    seen = _load_keys_seen()
+    lines, fresh = [], set()
     for prov, ks in list(found.items())[:6]:
         for k in sorted(ks)[:10]:
+            if k in seen:
+                continue  # уже показывали юзеру
+            fresh.add(k)
             lines.append(f"🔑 {prov}: <code>{escape(k)}</code>")
+    if fresh:
+        try:
+            _KEYS_SEEN_DIR.mkdir(parents=True, exist_ok=True)
+            _KEYS_SEEN_PATH.write_text(
+                json.dumps(sorted(seen | fresh)), encoding="utf-8")
+        except Exception:
+            pass
     return "\n".join(lines)
 
 

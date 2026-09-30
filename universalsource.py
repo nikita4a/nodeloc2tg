@@ -208,6 +208,54 @@ class UniversalForumSource:
         except Exception:
             return None
 
+    # ---------- jina-фоллбек (CF-гейт/неопознанный движок) ----------
+    _JINA_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+    def _jina_get(self, url: str) -> str:
+        # ВАЖНО: без явного UA jina отдаёт 403 при chrome-имперсонации curl_cffi
+        hdr = {"User-Agent": self._JINA_UA}
+        try:
+            r = self.s.get("https://r.jina.ai/" + url, timeout=45, headers=hdr)
+            if r.status_code == 429:
+                import time as _t
+                _t.sleep(4)
+                r = self.s.get("https://r.jina.ai/" + url, timeout=45, headers=hdr)
+            return r.text if r.status_code == 200 else ""
+        except Exception:
+            return ""
+
+    def _jina_items(self, limit: int) -> list[dict]:
+        """Листинг форума через r.jina.ai: markdown-ссылки на треды."""
+        host = urlparse(self.base).hostname or ""
+        md = self._jina_get(self.base)
+        if len(md) < 300:
+            return []
+        out, seen = [], set()
+        for m in re.finditer(r"\[([^\]\[]{8,150})\]\((https?://[^)]+)\)", md):
+            title, link = m.group(1).strip(), m.group(2).strip()
+            lhost = urlparse(link).hostname or ""
+            path = urlparse(link).path
+            if lhost != host or not path or path in ("/",):
+                continue
+            # тред-подобный путь: содержит /t/, thread-, viewtopic, topic, число
+            if not re.search(r"/t/|thread-|viewtopic|topic|/\d", path):
+                continue
+            if title in seen:
+                continue
+            seen.add(title)
+            out.append({"tid": _tid_from_link(link), "title": title,
+                        "url": link, "body_html": "", "author": "",
+                        "cat": "", "created": ""})
+        for p in out[:limit]:
+            self._cache[p["tid"]] = p
+        return out[:limit]
+
+    def _md_to_text(self, md: str) -> str:
+        md = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", md)
+        md = re.sub(r"(?m)^(Title|URL Source|Published Time|Markdown Content):.*$", "", md)
+        md = re.sub(r"(?m)^\[Image \d+\].*$", "", md)
+        return re.sub(r"<[^>]+>", " ", md).strip()
+
     # ---------- интерфейс источника ----------
     def latest(self, limit: int = 30) -> list[int]:
         kind = self._detect()
@@ -216,9 +264,9 @@ class UniversalForumSource:
         elif kind in ("rss", "atom"):
             items = self._feed_items(limit)
         else:
-            log.warning("%s: движок не опознан (%s) — источник мёртв",
-                        self.name, self.base)
-            return []
+            items = self._jina_items(limit)  # CF-гейт: рендерим через jina
+            if items:
+                self._kind = "jina"
         return [p["tid"] for p in items]
 
     def fetch(self, tid: int):
@@ -226,12 +274,17 @@ class UniversalForumSource:
         if p is None:
             if self._detect() == "discourse":
                 p = self._discourse_topic(tid)
+            elif self._kind == "jina":
+                self._jina_items(50)
+                p = self._cache.get(tid)
             else:
                 self._feed_items(50)
                 p = self._cache.get(tid)
         if p is None:
             return None
         body_text = _html_to_text(p.get("body_html") or "") or (p.get("title") or "")
+        if self._kind == "jina" and len(body_text) < 200:
+            body_text = self._md_to_text(self._jina_get(p["url"]))[:6000]
         return CFTopic(
             topic_id=tid,
             title=p["title"],

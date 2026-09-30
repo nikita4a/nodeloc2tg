@@ -87,6 +87,10 @@ PIN_TITLE = re.compile(
 
 REDDIT_LAST = [0.0]
 
+# ротация: за 5-мин цикл опрашиваем только окно из N веб-источников —
+# меньше 429 (reddit/jina), быстрее цикл, полнота за 2-3 цикла
+_WEB_PER_CYCLE = 10
+
 
 def clean_title(t: str) -> str:
     t = re.sub(r"\s{2,}", " ", t).strip()
@@ -113,6 +117,7 @@ def _tid(link: str) -> int:
 class WebListSource:
     # тред-фечи через jina дорогие — берём немного нового за цикл
     min_body = 40
+    _seq = 0  # порядковый номер для round-robin ротации
 
     def __init__(self, name: str, list_url: str, pattern: str,
                  how: str = "jina", proxy: str = "", timeout: int = 45):
@@ -122,6 +127,8 @@ class WebListSource:
         self.how = how
         self.timeout = timeout
         self._cache: dict[int, dict] = {}
+        self._seq = WebListSource._seq
+        WebListSource._seq += 1
         from curl_cffi import requests as creq
         self.s = creq.Session(impersonate="chrome124")
         if proxy:
@@ -129,12 +136,22 @@ class WebListSource:
 
     # ---------- транспорт ----------
     def _jina_get(self, url: str) -> str:
-        try:
-            r = self.s.get("https://r.jina.ai/" + url, timeout=self.timeout,
-                           headers={"User-Agent": JINA_UA})
-            return r.text if r.status_code == 200 else ""
-        except Exception:
-            return ""
+        for attempt in (1, 2):
+            try:
+                r = self.s.get("https://r.jina.ai/" + url, timeout=self.timeout,
+                               headers={"User-Agent": JINA_UA})
+                if r.status_code == 200:
+                    return r.text
+                if r.status_code == 429 and attempt == 1:
+                    time.sleep(4)
+                    continue
+                return ""
+            except Exception:
+                if attempt == 1:
+                    time.sleep(2)
+                    continue
+                return ""
+        return ""
 
     def _http_get(self, url: str) -> str:
         try:
@@ -197,6 +214,12 @@ class WebListSource:
 
     # ---------- интерфейс источника ----------
     def latest(self, limit: int = 30) -> list[int]:
+        # round-robin по эпохе (5-мин слот): окно из _WEB_PER_CYCLE штук
+        total = WebListSource._seq
+        if total > _WEB_PER_CYCLE:
+            epoch = int(time.time() // 300)
+            if (self._seq + epoch) % total >= _WEB_PER_CYCLE:
+                return []  # не мой слот — тихо пропускаем
         if "reddit.com" in self.list_url:  # анти-429
             wait = 25 - (time.time() - REDDIT_LAST[0])
             if wait > 0:
@@ -216,6 +239,10 @@ class WebListSource:
             if len(raw) < 300:
                 time.sleep(5)
                 raw = self._http_get(self.list_url)
+            if len(raw) < 300 and "www.reddit.com" in self.list_url:
+                # 429 с www — пробуем old.reddit (другой лимит-бакет)
+                raw = self._http_get(
+                    self.list_url.replace("www.reddit.com", "old.reddit.com"))
             if len(raw) > 300:
                 topics = self._parse_feed(raw, with_body=True)
         if topics is None:

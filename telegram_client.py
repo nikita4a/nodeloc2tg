@@ -29,6 +29,8 @@ class TelegramClient:
             raise ValueError("bot_token пустой")
         self.bot_token = bot_token
         self.channel_id = channel_id
+        # мульти-таргет: '7448683285,@NODELOCRUS' — постим во все
+        self.targets = [t.strip() for t in channel_id.split(',') if t.strip()]
         self.timeout = timeout
         self.session = requests.Session()
         # trust_env=False: игнорировать системные прокси-переменные (HTTP_PROXY и
@@ -43,13 +45,13 @@ class TelegramClient:
             log.info("TG API через прокси: %s", proxy)
 
     # ---------- публичное ----------
-    def send_message(self, html_text: str, *, disable_preview: bool = True) -> int:
+    def _send_message_chat(self, chat: str, html_text: str, *, disable_preview: bool = True) -> int:
         """Отправить HTML-сообщение в канал. Возвращает message_id.
 
         Raises TelegramError если TG отклонил окончательно.
         """
         params = {
-            "chat_id": self.channel_id,
+            "chat_id": chat,
             "text": html_text,
             "parse_mode": "HTML",
             "disable_web_page_preview": disable_preview,
@@ -85,7 +87,7 @@ class TelegramClient:
                 time.sleep(wait)
         raise TelegramError("sendMessage: превышены 3 попытки")
 
-    def send_photo(self, image_url: str, caption: str) -> int:
+    def _send_photo_chat(self, chat: str, image_url: str, caption: str) -> int:
         """Отправить фото с HTML-подписью в канал.
 
         Скачивает картинку по URL и шлёт как multipart (надёжнее, чем
@@ -106,7 +108,7 @@ class TelegramClient:
             try:
                 files = {"photo": ("image.jpg", img_bytes, "image/jpeg")}
                 data = {
-                    "chat_id": self.channel_id,
+                    "chat_id": chat,
                     "caption": cap,
                     "parse_mode": "HTML",
                 }
@@ -132,7 +134,7 @@ class TelegramClient:
                 time.sleep(wait)
         raise TelegramError("sendPhoto: превышены 3 попытки")
 
-    def send_media_group(self, image_urls: list, caption: str = "") -> int:
+    def _send_media_group_chat(self, chat: str, image_urls: list, caption: str = "") -> int:
         """Отправить альбом фото (2-10). Возвращает message_id первого.
 
         caption ставится на первое фото (TG показывает его под альбомом).
@@ -164,7 +166,7 @@ class TelegramClient:
             try:
                 resp = self.session.post(
                     API_BASE.format(token=self.bot_token, method="sendMediaGroup"),
-                    data={"chat_id": self.channel_id, "media": _json.dumps(media)},
+                    data={"chat_id": chat, "media": _json.dumps(media)},
                     files=files,
                     timeout=self.timeout,
                 )
@@ -184,7 +186,7 @@ class TelegramClient:
                 time.sleep(wait)
         raise TelegramError("sendMediaGroup: превышены 3 попытки")
 
-    def send_video(self, video_url: str, caption: str) -> int:
+    def _send_video_chat(self, chat: str, video_url: str, caption: str) -> int:
         """Отправить видео с HTML-подписью (скачиваем и шлём multipart)."""
         cap = caption[:1020] + "…" if len(caption) > 1024 else caption
         data = self._download_image(video_url)
@@ -195,7 +197,7 @@ class TelegramClient:
         for attempt in range(1, 4):
             try:
                 files = {"video": ("video.mp4", data, "video/mp4")}
-                payload = {"chat_id": self.channel_id, "caption": cap,
+                payload = {"chat_id": chat, "caption": cap,
                            "parse_mode": "HTML"}
                 resp = self.session.post(
                     API_BASE.format(token=self.bot_token, method="sendVideo"),
@@ -213,6 +215,32 @@ class TelegramClient:
                 if attempt == 3:
                     raise TelegramError(f"sendVideo сеть: {e}")
         raise TelegramError("sendVideo: превышены попытки")
+
+    # ---------- бродкаст во все таргеты ----------
+    def _broadcast(self, method_name: str, *args, **kwargs) -> int:
+        """Отправить во все таргеты; вернуть message_id первого."""
+        mids = []
+        for chat in self.targets:
+            try:
+                mids.append(getattr(self, method_name)(chat, *args, **kwargs))
+            except TelegramError as e:
+                log.warning("TG %s → %s: %s", method_name, chat, e)
+        if not mids:
+            raise TelegramError(f"{method_name}: все таргеты провалились")
+        return mids[0]
+
+    def send_message(self, html_text: str, *, disable_preview: bool = True) -> int:
+        return self._broadcast("_send_message_chat", html_text,
+                               disable_preview=disable_preview)
+
+    def send_photo(self, image_url: str, caption: str) -> int:
+        return self._broadcast("_send_photo_chat", image_url, caption)
+
+    def send_media_group(self, image_urls: list, caption: str = "") -> int:
+        return self._broadcast("_send_media_group_chat", image_urls, caption)
+
+    def send_video(self, video_url: str, caption: str) -> int:
+        return self._broadcast("_send_video_chat", video_url, caption)
 
     def _download_image(self, url: str) -> bytes | None:
         """Скачать картинку/видео. Возвращает bytes или None.
